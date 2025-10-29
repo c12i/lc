@@ -1,0 +1,3 @@
+# 3612. Adjacent Increasing Subarrays Detection I
+
+https://leetcode.com/problems/adjacent-increasing-subarrays-detection-i/
