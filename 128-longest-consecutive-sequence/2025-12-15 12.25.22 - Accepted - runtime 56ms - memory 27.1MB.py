@@ -8,7 +8,7 @@ class Solution(object):
         max_len = 0
         for n in nums:
             # check if we are begnining a new sequence
-            if n + 1 not in nums:
+            if n - 1 in nums:
                 continue
             curr_len = 1
             next_num = n + 1

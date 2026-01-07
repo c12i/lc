@@ -7,7 +7,7 @@
 class Solution(object):
     def delNodes(self, root, to_delete):
         to_delete = set(to_delete)
-        roots = [root]
+        roots = []
 
         def dfs(node):
             if not node:
@@ -28,5 +28,7 @@ class Solution(object):
             return node
 
         root = dfs(root)
+        if root:
+            roots.append(root)
         
         return roots
