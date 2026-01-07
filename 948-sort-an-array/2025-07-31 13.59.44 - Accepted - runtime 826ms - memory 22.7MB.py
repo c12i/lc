@@ -4,27 +4,7 @@ class Solution(object):
         :type nums: List[int]
         :rtype: List[int]
         """
-        return self.countSort(nums)
-
-    
-    def countSort(self, arr):
-        if not arr:
-            return []
-
-        max_val = max(arr)
-        count = [0] * (max_val + 1)
-
-        for num in arr:
-            count[num] += 1
-
-        print(count)
-
-        sorted_arr = []
-        for num, freq in enumerate(count):
-            sorted_arr.extend([num] * freq)
-            print(sorted_arr)
-
-        return sorted_arr
+        return self.heapSort(nums)
 
 
     def quickSortInPlace(self, arr, low, high):
