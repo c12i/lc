@@ -5,6 +5,12 @@ on:
     # run weekly on Sunday at 00:00 UTC
     - cron: "0 0 * * 0"
   workflow_dispatch:
+    inputs:
+      clear_cache:
+        description: "Clear cache and force re-export"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   sync:
@@ -51,10 +57,33 @@ jobs:
             echo "Patch applied successfully"
           fi
 
+      - name: Get cache timestamp (2 hour window)
+        id: cache-timestamp
+        run: |
+          # create a timestamp that changes every 2 hours
+          TIMESTAMP=$(date -u +"%Y%m%d-%H")
+          HOUR=$(echo $TIMESTAMP | cut -d'-' -f2)
+          WINDOW=$((HOUR / 2 * 2))
+          CACHE_KEY=$(date -u +"%Y%m%d")-$(printf "%02d" $WINDOW)
+          echo "cache_key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: leetcode-export-new-$CACHE_KEY"
+
+      - name: Restore /new directory from cache
+        id: cache-new
+        if: github.event.inputs.clear_cache != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: new
+          key: leetcode-export-new-${{ steps.cache-timestamp.outputs.cache_key }}
+          restore-keys: |
+            leetcode-export-new-
+
       - name: Create Working Dir
-        run: mkdir new
+        if: steps.cache-new.outputs.cache-hit != 'true'
+        run: mkdir -p new
 
       - name: Export LeetCode submissions
+        if: steps.cache-new.outputs.cache-hit != 'true'
         working-directory: ./new
         env:
           LEETCODE_COOKIES: ${{ secrets.LEETCODE_COOKIES }}
@@ -63,23 +92,36 @@ jobs:
             --cookies "$LEETCODE_COOKIES" \
             --only-accepted \
             --only-last-submission \
-            --language=python3,golang,javascript,rust \
+            --language=python,python3,golang,javascript,rust \
             --no-problem-statement \
             --verbose
 
       - name: Run migration script
-        run: python3 migrate_problems.py
+        run: python3 migrate_problems.py --no-cleanup
+
+      - name: Save /new directory to cache
+        if: steps.cache-new.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: new
+          key: leetcode-export-new-${{ steps.cache-timestamp.outputs.cache_key }}
 
       - name: Check for changes
         id: git-check
         run: |
-          git diff --exit-code || echo "changes=true" >> $GITHUB_OUTPUT
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected"
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Commit and push changes
         if: steps.git-check.outputs.changes == 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add .
           git commit -m "chore: sync LeetCode solutions [skip ci]"
           git push
