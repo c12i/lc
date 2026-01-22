@@ -26,6 +26,34 @@ jobs:
       - name: Install leetcode-export
         run: pip install leetcode-export
 
+      - name: Patch leetcode-export utils.py
+        run: |
+          # determine which Python command to use
+          if command -v python3 &> /dev/null && python3 -c "import leetcode_export" 2>/dev/null; then
+            PYTHON_CMD="python3"
+          elif command -v python &> /dev/null && python -c "import leetcode_export" 2>/dev/null; then
+            PYTHON_CMD="python"
+          else
+            echo "Error: leetcode-export is not installed"
+            exit 1
+          fi
+
+          echo "Using Python command: $PYTHON_CMD"
+          UTILS_PATH=$($PYTHON_CMD -c "import leetcode_export; import os; print(os.path.join(os.path.dirname(leetcode_export.__file__), 'utils.py'))")
+          echo "Patching $UTILS_PATH"
+
+          # check if postgresql is already in the file
+          if grep -q '"postgresql"' "$UTILS_PATH"; then
+            echo "postgresql extension already exists, skipping patch"
+          else
+            # add postgresql extension to FILE_EXTENSIONS dictionary
+            sed -i 's/FILE_EXTENSIONS = {/FILE_EXTENSIONS = {\n    "postgresql": "sql",/' "$UTILS_PATH"
+            echo "Patch applied successfully"
+          fi
+
+      - name: Create Working Dir
+        run: mkdir new
+
       - name: Export LeetCode submissions
         working-directory: ./new
         env:
