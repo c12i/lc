@@ -1,0 +1,57 @@
+name: Sync LeetCode Solutions
+
+on:
+  schedule:
+    # run weekly on Sunday at 00:00 UTC
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install leetcode-export
+        run: pip install leetcode-export
+
+      - name: Export LeetCode submissions
+        working-directory: ./new
+        env:
+          LEETCODE_COOKIES: ${{ secrets.LEETCODE_COOKIES }}
+        run: |
+          leetcode-export \
+            --cookies "$LEETCODE_COOKIES" \
+            --only-accepted \
+            --only-last-submission \
+            --language=python3,golang,javascript,rust \
+            --no-problem-statement \
+            --verbose
+
+      - name: Run migration script
+        run: python3 migrate_problems.py
+
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code || echo "changes=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .
+          git commit -m "chore: sync LeetCode solutions [skip ci]"
+          git push
