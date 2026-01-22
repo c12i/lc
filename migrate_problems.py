@@ -6,6 +6,7 @@ Only migrates problems that don't already exist in the root.
 Also generates README files for any problems missing them.
 """
 
+import argparse
 import os
 import re
 import shutil
@@ -82,6 +83,17 @@ def generate_missing_readmes(workspace_root):
     return created_count
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description='Migrate new LeetCode problems from /new to root directory'
+    )
+    parser.add_argument(
+        '--no-cleanup',
+        action='store_true',
+        help='Skip deleting problem directories from /new after migration'
+    )
+    args = parser.parse_args()
+
     # Get the script's directory (workspace root) and new directory
     workspace_root = Path(__file__).parent.absolute()
     new_dir = workspace_root / 'new'
@@ -131,26 +143,29 @@ def main():
     print(f"  Successfully migrated: {migrated_count}")
     print(f"  Failed: {failed_count}")
     print()
-    
-    # Now delete all problem directories from /new
-    print("Cleaning up /new directory...")
-    deleted_count = 0
-    delete_failed_count = 0
-    
-    for problem in sorted(new_problems):
-        problem_path = new_dir / problem
-        try:
-            print(f"Deleting: {problem}")
-            shutil.rmtree(problem_path)
-            deleted_count += 1
-        except Exception as e:
-            print(f"  ERROR: Failed to delete {problem}: {e}")
-            delete_failed_count += 1
-    
-    print()
-    print(f"Cleanup complete!")
-    print(f"  Successfully deleted: {deleted_count}")
-    print(f"  Failed to delete: {delete_failed_count}")
+
+    # Optionally delete all problem directories from /new
+    if args.no_cleanup:
+        print("Skipping cleanup of /new directory (--no-cleanup flag set)")
+    else:
+        print("Cleaning up /new directory...")
+        deleted_count = 0
+        delete_failed_count = 0
+
+        for problem in sorted(new_problems):
+            problem_path = new_dir / problem
+            try:
+                print(f"Deleting: {problem}")
+                shutil.rmtree(problem_path)
+                deleted_count += 1
+            except Exception as e:
+                print(f"  ERROR: Failed to delete {problem}: {e}")
+                delete_failed_count += 1
+
+        print()
+        print(f"Cleanup complete!")
+        print(f"  Successfully deleted: {deleted_count}")
+        print(f"  Failed to delete: {delete_failed_count}")
 
     # Generate README files for any problems missing them
     generate_missing_readmes(workspace_root)
