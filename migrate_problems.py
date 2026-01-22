@@ -3,9 +3,11 @@
 """
 Script to migrate new LeetCode problems from /new directory to root directory.
 Only migrates problems that don't already exist in the root.
+Also generates README files for any problems missing them.
 """
 
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -14,7 +16,7 @@ def get_problem_directories(base_path):
     problems = set()
     if not os.path.exists(base_path):
         return problems
-    
+
     for item in os.listdir(base_path):
         item_path = os.path.join(base_path, item)
         if os.path.isdir(item_path) and item not in ['new', '.git']:
@@ -22,15 +24,68 @@ def get_problem_directories(base_path):
             # (contain numbers or are problem-like names)
             if any(char.isdigit() for char in item) or item.startswith('README'):
                 problems.add(item)
-    
+
     return problems
 
+def extract_problem_info(dirname):
+    """Extract problem number and name from directory name."""
+    # Pattern: {number}-{problem-name}
+    match = re.match(r'^(\d+)-(.+)$', dirname)
+    if match:
+        number = match.group(1)
+        name_slug = match.group(2)
+        # Convert slug to title case
+        name = name_slug.replace('-', ' ').title()
+        return number, name, name_slug
+    return None, None, None
+
+def create_readme(problem_dir, number, title, slug):
+    """Create a README.md file for a problem if it doesn't exist."""
+    readme_path = problem_dir / 'README.md'
+
+    # Don't overwrite existing READMEs
+    if readme_path.exists():
+        return False
+
+    content = f"# {number}. {title}\n\nhttps://leetcode.com/problems/{slug}/\n"
+
+    with open(readme_path, 'w') as f:
+        f.write(content)
+
+    return True
+
+def generate_missing_readmes(workspace_root):
+    """Generate README files for all problems that are missing them."""
+    print("\nChecking for missing README files...")
+    created_count = 0
+
+    for item in sorted(os.listdir(workspace_root)):
+        item_path = workspace_root / item
+
+        # Skip if not a directory or special directories
+        if not item_path.is_dir() or item in ['new', '.git', '__pycache__']:
+            continue
+
+        # Extract problem info
+        number, title, slug = extract_problem_info(item)
+
+        if number and title and slug:
+            if create_readme(item_path, number, title, slug):
+                print(f"  ✓ Created README for: {number}. {title}")
+                created_count += 1
+
+    if created_count > 0:
+        print(f"\nGenerated {created_count} missing README files")
+    else:
+        print("  All problems already have README files")
+
+    return created_count
+
 def main():
-    # Get the script's directory and workspace root
-    script_dir = Path(__file__).parent.absolute()
-    workspace_root = script_dir.parent
-    new_dir = script_dir
-    
+    # Get the script's directory (workspace root) and new directory
+    workspace_root = Path(__file__).parent.absolute()
+    new_dir = workspace_root / 'new'
+
     print(f"Workspace root: {workspace_root}")
     print(f"New directory: {new_dir}")
     print()
@@ -96,6 +151,10 @@ def main():
     print(f"Cleanup complete!")
     print(f"  Successfully deleted: {deleted_count}")
     print(f"  Failed to delete: {delete_failed_count}")
+
+    # Generate README files for any problems missing them
+    generate_missing_readmes(workspace_root)
+
     print()
     print("Done!")
 
